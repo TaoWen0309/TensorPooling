@@ -12,7 +12,6 @@ sys.path.append("models/")
 from mlp import MLP
 
 from torch.autograd import Variable
-import pdb
 import gudhi as gd
 import numpy as np
 
@@ -259,6 +258,7 @@ class GraphCNN(nn.Module):
                 elem.extend([1]*len(graph.g))
 
             idx.extend([[i, j] for j in range(start_idx[i], start_idx[i+1], 1)])
+        
         elem = torch.FloatTensor(elem)
         idx = torch.LongTensor(idx).transpose(0,1)
         graph_pool = torch.sparse.FloatTensor(idx, elem, torch.Size([len(batch_graph), start_idx[-1]]))
