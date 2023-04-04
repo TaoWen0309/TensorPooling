@@ -63,7 +63,7 @@ def pass_data_iteratively(model, graphs, minibatch_size = 64):
     return torch.cat(output, 0)
 
 # eval on both train and test graphs
-def test(args, model, device, train_graphs, test_graphs, epoch):
+def test(model, device, train_graphs, test_graphs):
     model.eval()
     # train graphs
     output = pass_data_iteratively(model, train_graphs)
@@ -144,10 +144,10 @@ def main():
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
         print("Current epoch is:", epoch)
-        scheduler.step() # only takes effect at the specified step_size
 
         avg_loss = train(args, model, device, train_graphs, optimizer, epoch)
-        acc_train, acc_test = test(args, model, device, train_graphs, test_graphs, epoch)
+        scheduler.step() # only takes effect at the specified step_size
+        acc_train, acc_test = test(model, device, train_graphs, test_graphs)
 
         max_acc = max(max_acc, acc_test)
 
@@ -155,12 +155,9 @@ def main():
             with open(args.filename, 'a+') as f:
                 f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
                 f.write("\n")
-        print("")
 
-        print(model.eps)
-
-    with open(str(args.dataset)+'acc_results.txt', 'a+') as f:
-        f.write(str(max_acc) + '\n')
+    with open('acc_results.txt', 'a+') as f:
+        f.write(str(args.dataset) + ' ' + str(max_acc) + '\n')
     
 
 if __name__ == '__main__':
