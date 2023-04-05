@@ -1,7 +1,6 @@
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
@@ -35,8 +34,7 @@ def train(args, model, device, train_graphs, optimizer, epoch):
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()         
-            optimizer.step()
-        
+            optimizer.step()      
 
         loss = loss.detach().cpu().numpy()
         loss_accum += loss
@@ -61,7 +59,7 @@ def pass_data_iteratively(model, graphs, minibatch_size = 64):
         output.append(model([graphs[j] for j in sampled_idx]).detach())
     return torch.cat(output, 0)
 
-def test(args, model, device, train_graphs, test_graphs, epoch):
+def test(model, device, train_graphs, test_graphs):
     model.eval()
 
     output = pass_data_iteratively(model, train_graphs)
@@ -77,7 +75,6 @@ def test(args, model, device, train_graphs, test_graphs, epoch):
     acc_test = correct / float(len(test_graphs))
 
     print("accuracy train: %f test: %f" % (acc_train, acc_test))
-
     return acc_train, acc_test
 
 def main():
@@ -139,24 +136,21 @@ def main():
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
-        scheduler.step()
+        print("Current epoch is:", epoch)
 
         avg_loss = train(args, model, device, train_graphs, optimizer, epoch)
-        acc_train, acc_test = test(args, model, device, train_graphs, test_graphs, epoch)
+        scheduler.step()
+        acc_train, acc_test = test(model, device, train_graphs, test_graphs)
 
         max_acc = max(max_acc, acc_test)
-        print("Current best result is:", max_acc)
 
         if not args.filename == "":
             with open(args.filename, 'a+') as f:
                 f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
                 f.write("\n")
-        print("")
 
-        print(model.eps)
-
-    with open(str(args.dataset)+'acc_results.txt', 'a+') as f:
-        f.write(str(max_acc) + '\n')
+    with open('acc_results.txt', 'a+') as f:
+        f.write(str(args.dataset) + ' ' + str(max_acc) + '\n')
     
 
 if __name__ == '__main__':

@@ -7,8 +7,7 @@ from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import degree
 import torch_geometric.transforms as T
 from torch_geometric.utils.convert import to_networkx
-import pickle
-import time
+
 
 class S2VGraph(object):
     def __init__(self, g, label, node_tags=None, node_features=None):
@@ -104,7 +103,6 @@ def load_data(dataset, degree_as_tag):
         edges = [list(pair) for pair in g.g.edges()]
         edges.extend([[i, j] for j, i in edges])
 
-        deg_list = list(dict(g.g.degree(range(len(g.g)))).values())
         g.edge_mat = torch.LongTensor(edges).transpose(0,1)
 
     if degree_as_tag:
@@ -123,11 +121,9 @@ def load_data(dataset, degree_as_tag):
         g.node_features = torch.zeros(len(g.node_tags), len(tagset))
         g.node_features[range(len(g.node_tags)), [tag2index[tag] for tag in g.node_tags]] = 1
 
-
     print('# classes: %d' % len(label_dict))
-    print('# maximum node tag: %d' % len(tagset))
-
-    print("# data: %d" % len(g_list))
+    print('# total number of nodes: %d' % len(tagset))
+    print("# number of graphs: %d" % len(g_list))
 
     return g_list, len(label_dict)
 
@@ -136,12 +132,8 @@ def separate_data(graph_list, seed, fold_idx):
     skf = StratifiedKFold(n_splits=10, shuffle = True, random_state = seed)
 
     labels = [graph.label for graph in graph_list]
-    idx_list = []
-    for idx in skf.split(np.zeros(len(labels)), labels):
-        idx_list.append(idx)
-    train_idx, test_idx = idx_list[fold_idx]
-    print(test_idx)
-
+    
+    train_idx, test_idx = list(skf.split(np.zeros(len(labels)), labels))[fold_idx]
     train_graph_list = [graph_list[i] for i in train_idx]
     test_graph_list = [graph_list[i] for i in test_idx]
 
