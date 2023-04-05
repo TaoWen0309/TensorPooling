@@ -7,8 +7,6 @@ from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import degree
 import torch_geometric.transforms as T
 from torch_geometric.utils.convert import to_networkx
-import pickle
-import time
 
 class S2VGraph(object):
     def __init__(self, g, label, node_tags=None, node_features=None):
@@ -179,7 +177,7 @@ def get_dataset(name, sparse=True, cleaned=False):
         else:
             deg = torch.cat(degs, dim=0).to(torch.float)
             mean, std = deg.mean().item(), deg.std().item()
-            dataset.transform = NormalizedDegree(mean, std)
+            dataset.transform = (deg-mean)/std
 
     if not sparse:
         num_nodes = max_num_nodes = 0

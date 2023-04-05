@@ -5,13 +5,11 @@ from torch_geometric.nn.pool.topk_pool import topk,filter_adj
 from torch_geometric.nn import GCNConv, SAGEConv, GATConv, GINConv
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 from torch_geometric.utils import to_dense_adj
-import time
 import sys
 sys.path.append("models/")
 from mlp import MLP
 
 from torch.autograd import Variable
-import pdb
 import gudhi as gd
 import numpy as np
 
@@ -116,7 +114,7 @@ class GraphCNN(nn.Module):
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
         # for attentional second-order pooling
-        self.PI_hidden_dim = 16
+        self.PI_hidden_dim = 128
         self.total_latent_dim = input_dim + hidden_dim * (num_layers - 1) + self.PI_hidden_dim
         self.dense_dim = self.total_latent_dim
         self.attend = nn.Linear(self.total_latent_dim - self.PI_hidden_dim, 1)
@@ -137,7 +135,6 @@ class GraphCNN(nn.Module):
 
         padded_neighbor_list = []
         start_idx = [0]
-
 
         for i, graph in enumerate(batch_graph):
             start_idx.append(start_idx[i] + len(graph.g))
@@ -161,13 +158,12 @@ class GraphCNN(nn.Module):
     def __preprocess_neighbors_sumavepool_witnesses(self, batch_graph):
         ###create block diagonal sparse matrix
         edge_attr = None
-
         edge_mat_list = []
         start_idx = [0]
         pooled_x = []
         pooled_graph_sizes = []
         PI_witnesses_dgms = []
-        witness_running_time = []
+
         for i, graph in enumerate(batch_graph):
             x = graph.x.to(self.device)
             edge_index = graph.edge_index.to(self.device)
@@ -182,6 +178,11 @@ class GraphCNN(nn.Module):
             x = x[perm]
             edge_index, _ = filter_adj(edge_index, edge_attr, perm, num_nodes=graph.x.size(0))
 
+            start_idx.append(start_idx[i] + x.size(0))
+            edge_mat_list.append(edge_index + start_idx[i])
+            pooled_x.append(x)
+            pooled_graph_sizes.append(x.size(0))
+
             # witnesses complex
             network_statistics = torch.sum(to_dense_adj(graph.edge_index)[0,:,:], dim = 1).to(self.device)
             witnesses_perm = topk(network_statistics, 10, batch)
@@ -193,11 +194,6 @@ class GraphCNN(nn.Module):
             # persistence image based on witnesses diagram
             PI_witnesses_dgm = torch.FloatTensor(persistence_images(witnesses_dgm, normalization = False).reshape(1,-1)).to(self.device) # vectorization
             PI_witnesses_dgms.append(PI_witnesses_dgm)
-
-            start_idx.append(start_idx[i] + x.size(0))
-            edge_mat_list.append(edge_index + start_idx[i])
-            pooled_x.append(x)
-            pooled_graph_sizes.append(x.size(0))
 
         pooled_X_concat = torch.cat(pooled_x, 0).to(self.device)
         Adj_block_idx = torch.cat(edge_mat_list, 1).to(self.device)
@@ -212,8 +208,7 @@ class GraphCNN(nn.Module):
 
         Adj_block = torch.sparse.FloatTensor(Adj_block_idx, Adj_block_elem, torch.Size([start_idx[-1],start_idx[-1]]))
 
-
-        return Adj_block.to(self.device), pooled_X_concat, PI_witnesses_dgms, pooled_graph_sizes
+        return Adj_block.to(self.device), pooled_X_concat, pooled_graph_sizes, PI_witnesses_dgms
 
 
     def __preprocess_graphpool(self, batch_graph):
@@ -251,9 +246,8 @@ class GraphCNN(nn.Module):
         pooled_rep = torch.max(h_with_dummy[padded_neighbor_list], dim = 1)[0]
         return pooled_rep
 
-
-    def next_layer_eps(self, h, layer, padded_neighbor_list = None, Adj_block = None):
-        ###pooling neighboring nodes and center nodes separately by epsilon reweighting. 
+    def next_layer(self, h, layer, padded_neighbor_list = None, Adj_block = None, learn_eps = True):
+        # pooling neighboring nodes and center nodes separately by epsilon reweighting. 
 
         if self.neighbor_pooling_type == "max":
             ##If max pooling
@@ -265,37 +259,15 @@ class GraphCNN(nn.Module):
                 #If average pooling
                 degree = torch.spmm(Adj_block, torch.ones((Adj_block.shape[0], 1)).to(self.device))
                 pooled = pooled/degree
-
-        #Reweights the center node representation when aggregating it with its neighbors
-        pooled = pooled + (1 + self.eps[layer])*h
+        
+        if learn_eps:
+            # reweights the center node representation when aggregating it with its neighbors
+            pooled = pooled + (1 + self.eps[layer])*h
+       
         pooled_rep = self.mlps[layer](pooled)
         h = self.batch_norms[layer](pooled_rep)
 
-        #non-linearity
-        h = F.relu(h)
-        return h
-
-
-    def next_layer(self, h, layer, padded_neighbor_list = None, Adj_block = None):
-        ###pooling neighboring nodes and center nodes altogether  
-            
-        if self.neighbor_pooling_type == "max":
-            ##If max pooling
-            pooled = self.maxpool(h, padded_neighbor_list)
-        else:
-            #If sum or average pooling
-            pooled = torch.spmm(Adj_block, h) # ******
-            if self.neighbor_pooling_type == "average":
-                #If average pooling
-                degree = torch.spmm(Adj_block, torch.ones((Adj_block.shape[0], 1)).to(self.device))
-                pooled = pooled/degree
-
-        #representation of neighboring and center nodes 
-        pooled_rep = self.mlps[layer](pooled)
-
-        h = self.batch_norms[layer](pooled_rep)
-
-        #non-linearity
+        # non-linearity
         h = F.relu(h)
         return h
 
@@ -304,22 +276,16 @@ class GraphCNN(nn.Module):
         if self.neighbor_pooling_type == "max":
             padded_neighbor_list = self.__preprocess_neighbors_maxpool(batch_graph)
         else:
-            Adj_block, pooled_X_concat, PI_witnesses_dgms, pooled_graph_sizes = self.__preprocess_neighbors_sumavepool_witnesses(batch_graph) # we use the sumavepool function
+            Adj_block, pooled_X_concat, pooled_graph_sizes, PI_witnesses_dgms = self.__preprocess_neighbors_sumavepool_witnesses(batch_graph)
 
         hidden_rep = [pooled_X_concat]
         h = pooled_X_concat
 
         for layer in range(self.num_layers-1):
-            if self.neighbor_pooling_type == "max" and self.learn_eps:
-                h = self.next_layer_eps(h, layer, padded_neighbor_list = padded_neighbor_list)
-            elif not self.neighbor_pooling_type == "max" and self.learn_eps:
-                h = self.next_layer_eps(h, layer, Adj_block = Adj_block)
-            elif self.neighbor_pooling_type == "max" and not self.learn_eps:
-                h = self.next_layer(h, layer, padded_neighbor_list = padded_neighbor_list)
-            elif not self.neighbor_pooling_type == "max" and not self.learn_eps:
-                # operation
-                h = self.next_layer(h, layer, Adj_block = Adj_block)
-
+            if self.neighbor_pooling_type == "max":
+                h = self.next_layer(h, layer, padded_neighbor_list = padded_neighbor_list, learn_eps = self.learn_eps)
+            elif not self.neighbor_pooling_type == "max":
+                h = self.next_layer(h, layer, Adj_block = Adj_block, learn_eps = self.learn_eps)
             hidden_rep.append(h)
 
         hidden_rep = torch.cat(hidden_rep, 1)
@@ -333,7 +299,6 @@ class GraphCNN(nn.Module):
         batch_graphs_out = torch.zeros(len(graph_sizes), self.dense_dim).to(self.device)
         batch_graphs_out = Variable(batch_graphs_out)
 
-
         node_embeddings = torch.split(hidden_rep, graph_sizes, dim=0)
 
         for g_i in range(len(graph_sizes)):
@@ -346,6 +311,6 @@ class GraphCNN(nn.Module):
             witnesses_PI_out = (self.mlp_PI_witnesses(PI_witnesses_dgms[g_i])).view(-1)
             batch_graphs_out[g_i] = torch.cat([batch_graphs[g_i], witnesses_PI_out], dim=0)
 
-        score = F.dropout(self.linear1(batch_graphs_out), self.final_dropout, training=self.training)
+        score = F.dropout(self.linear1(batch_graphs_out), self.final_dropout)#, training=self.training)
 
         return score

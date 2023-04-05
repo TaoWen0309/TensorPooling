@@ -1,19 +1,14 @@
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-from torch_geometric.datasets import TUDataset
-import pickle
 from torch_geometric.utils import degree
-import torch_geometric.transforms as T
 from torch_geometric.utils.convert import to_networkx
 import networkx as nx
 from tqdm import tqdm
-import time
 
-from util import load_data, separate_data, separate_TUDataset, get_dataset
+from util import separate_TUDataset, get_dataset
 from models.witness_graphcnn import GraphCNN
 
 criterion = nn.CrossEntropyLoss()
@@ -24,7 +19,9 @@ class graph_features(object):
         self.std = std
 
     def __call__(self, data):
+        # degree
         f_deg = degree(data.edge_index[0], dtype=torch.float).view(-1, 1)
+        # betweenness
         node_betweenness = nx.betweenness_centrality(to_networkx(data))
         f_betweenness = torch.FloatTensor([node_betweenness[ii] for ii in node_betweenness]).view(-1, 1)
         # closeness
@@ -36,6 +33,7 @@ class graph_features(object):
         # eigen
         node_eigen = nx.eigenvector_centrality(to_networkx(data), max_iter=100000)
         f_eigen = torch.FloatTensor([node_eigen[ii] for ii in node_eigen]).view(-1, 1)
+        # all
         data.x = torch.cat([f_deg, f_betweenness, f_closeness, f_clustering, f_eigen], dim=1)
         return data
 
@@ -62,7 +60,6 @@ def train(args, model, device, train_graphs, optimizer, epoch):
             optimizer.zero_grad()
             loss.backward()         
             optimizer.step()
-        
 
         loss = loss.detach().cpu().numpy()
         loss_accum += loss
@@ -87,7 +84,7 @@ def pass_data_iteratively(model, graphs, minibatch_size = 64):
         output.append(model([graphs[j] for j in sampled_idx]).detach())
     return torch.cat(output, 0)
 
-def test(args, model, device, train_graphs, test_graphs, epoch):
+def test(model, device, train_graphs, test_graphs):
     model.eval()
 
     output = pass_data_iteratively(model, train_graphs)
@@ -132,7 +129,7 @@ def main():
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
     parser.add_argument('--hidden_dim', type=int, default=32,
                         help='number of hidden units (default: 64)')
-    parser.add_argument('--final_dropout', type=float, default=0.0,
+    parser.add_argument('--final_dropout', type=float, default=0.5,
                         help='final layer dropout (default: 0.5)')
     parser.add_argument('--graph_pooling_type', type=str, default="sum", choices=["sum", "average"],
                         help='Pooling for over nodes in a graph: sum or average')
@@ -166,11 +163,9 @@ def main():
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
-        scheduler.step()
-        start_time = time.time()
-
         avg_loss = train(args, model, device, train_graphs, optimizer, epoch)
-        acc_train, acc_test = test(args, model, device, train_graphs, test_graphs, epoch)
+        scheduler.step()
+        acc_train, acc_test = test(model, device, train_graphs, test_graphs)
 
         max_acc = max(max_acc, acc_test)
 
@@ -178,12 +173,9 @@ def main():
             with open(args.filename, 'a+') as f:
                 f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
                 f.write("\n")
-        print("")
 
-        print(model.eps)
-
-    with open(str(args.dataset)+'acc_results.txt', 'a+') as f:
-        f.write(str(max_acc) + '\n')
+    with open('acc_results.txt', 'a+') as f:
+        f.write(str(args.dataset)+' '+str(max_acc) + '\n')
     
 
 if __name__ == '__main__':
