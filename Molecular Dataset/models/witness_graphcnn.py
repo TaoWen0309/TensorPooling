@@ -9,65 +9,18 @@ from torch_geometric.utils import to_dense_adj
 import sys
 sys.path.append("models/")
 from mlp import MLP
+from cnn import CNN
+from diagram import sublevel_persistence_diagram, persistence_images, sum_diag_from_point_cloud
 
 from torch.autograd import Variable
-import gudhi as gd
 import numpy as np
+import networkx as nx
 
-def persistence_images(dgm, resolution = [5,5], return_raw = False, normalization = True, bandwidth = 1., power = 1.):
-    PXs, PYs = dgm[:, 0], dgm[:, 1]
-    xm, xM, ym, yM = PXs.min(), PXs.max(), PYs.min(), PYs.max()
-    x = np.linspace(xm, xM, resolution[0])
-    y = np.linspace(ym, yM, resolution[1])
-    X, Y = np.meshgrid(x, y)
-    Zfinal = np.zeros(X.shape)
-    X, Y = X[:, :, np.newaxis], Y[:, :, np.newaxis]
-
-    # Compute persistence image
-    P0, P1 = np.reshape(dgm[:, 0], [1, 1, -1]), np.reshape(dgm[:, 1], [1, 1, -1])
-    weight = np.abs(P1 - P0)
-    distpts = np.sqrt((X - P0) ** 2 + (Y - P1) ** 2)
-
-    if return_raw:
-        lw = [weight[0, 0, pt] for pt in range(weight.shape[2])]
-        lsum = [distpts[:, :, pt] for pt in range(distpts.shape[2])]
-    else:
-        weight = weight ** power
-        Zfinal = (np.multiply(weight, np.exp(-distpts ** 2 / bandwidth))).sum(axis=2)
-
-    output = [lw, lsum] if return_raw else Zfinal
-
-    if normalization:
-        norm_output = (output - np.min(output))/(np.max(output) - np.min(output))
-    else:
-        norm_output = output
-
-    return norm_output
-
-def diagram_from_simplex_tree(st, mode, dim=0):
-    st.compute_persistence(min_persistence=-1.)
-    dgm0 = st.persistence_intervals_in_dimension(0)[:, 1]
-
-    if mode == "superlevel":
-        dgm0 = - dgm0[np.where(np.isfinite(dgm0))]
-    elif mode == "sublevel":
-        dgm0 = dgm0[np.where(np.isfinite(dgm0))]
-    if dim==0:
-        return dgm0
-    elif dim==1:
-        dgm1 = st.persistence_intervals_in_dimension(1)[:,0]
-        return dgm0, dgm1
-
-def sum_diag_from_point_cloud(X, mode="superlevel"):
-    rc = gd.RipsComplex(points=X)
-    st = rc.create_simplex_tree(max_dimension=1)
-    dgm = diagram_from_simplex_tree(st, mode=mode)
-    sum_dgm = np.sum(dgm)
-    return sum_dgm
+from tltorch import TRL, TCL, FactorizedLinear, FactorizedTensor
 
 
 class GraphCNN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, learn_eps, graph_pooling_type, neighbor_pooling_type, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, learn_eps, neighbor_pooling_type, sublevel_filtration_methods, tensor_decom_type, tensor_layer_type, device):
         '''
             num_layers: number of layers in the neural networks (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -77,7 +30,9 @@ class GraphCNN(nn.Module):
             final_dropout: dropout ratio on the final linear layer
             learn_eps: If True, learn epsilon to distinguish center nodes from neighboring nodes. If False, aggregate neighbors and center nodes altogether. 
             neighbor_pooling_type: how to aggregate neighbors (mean, average, or max)
-            graph_pooling_type: how to aggregate entire nodes in a graph (mean, average)
+            sublevel_filtration_methods: methods for sublevel filtration on PD
+            decom_type: Tensor decomposition type, Tucker/CP/TT
+            tensor_layer: Tensor layer type, TCL/TRL'
             device: which device to use
         '''
 
@@ -86,16 +41,12 @@ class GraphCNN(nn.Module):
         self.final_dropout = final_dropout
         self.device = device
         self.num_layers = num_layers
-        self.graph_pooling_type = graph_pooling_type
         self.neighbor_pooling_type = neighbor_pooling_type
         self.learn_eps = learn_eps
         self.eps = nn.Parameter(torch.zeros(self.num_layers-1))
         self.num_neighbors = 5
 
-        ###List of MLPs
         self.mlps = torch.nn.ModuleList()
-
-        ###List of batchnorms applied to the output of MLP (input of the final prediction linear layer)
         self.batch_norms = torch.nn.ModuleList()
 
         for layer in range(self.num_layers-1):
@@ -103,8 +54,22 @@ class GraphCNN(nn.Module):
                 self.mlps.append(MLP(num_mlp_layers, input_dim, hidden_dim, hidden_dim))
             else:
                 self.mlps.append(MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim))
-
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+
+        self.sublevel_filtration_methods = sublevel_filtration_methods
+        self.cnn_dim = 8
+        self.cnn = CNN(self.cnn_dim)
+
+        self.tensor_decom_type = tensor_decom_type
+        self.tensor_input_shape = (8,12,12)
+        self.tensor_hidden_shape = [4,4,4]
+        # self.tensor_output_shape = (2,2)
+        
+        if tensor_layer_type == 'TCL':
+            self.tensor_layer = TCL(self.tensor_input_shape,self.tensor_hidden_shape)
+        elif tensor_layer_type == 'TRL':
+            self.tensor_layer = TRL(self.tensor_input_shape,self.tensor_hidden_shape)
+        # self.tensor_linear = FactorizedLinear(in_tensorized_features=tuple(self.tensor_hidden_shape),out_tensorized_features=self.tensor_output_shape)
 
         # for attentional second-order pooling
         self.PI_hidden_dim = 16
@@ -112,7 +77,7 @@ class GraphCNN(nn.Module):
         self.dense_dim = self.total_latent_dim
         self.attend = nn.Linear(self.total_latent_dim - self.PI_hidden_dim, 1)
         self.linear1 = nn.Linear(self.dense_dim, output_dim)
-        self.mlp_PI_witnesses = nn.Linear(25, self.PI_hidden_dim)
+        # self.mlp_PI_witnesses = nn.Linear(2500, self.PI_hidden_dim)
 
         # point clouds pooling for nodes
         self.score_node_layer = GCNConv(input_dim, self.num_neighbors * 2)
@@ -155,13 +120,21 @@ class GraphCNN(nn.Module):
         start_idx = [0]
         pooled_x = []
         pooled_graph_sizes = []
-        PI_witnesses_dgms = []
+        PI_list = []
 
         for i, graph in enumerate(batch_graph):
             x = graph.node_features.to(self.device)
             edge_index = graph.edge_mat.to(self.device)
+            adj = nx.adjacency_matrix(graph.g).todense()
+            PI_list_i = []
+            
+            for j in range(len(self.sublevel_filtration_methods)):
+                pd = sublevel_persistence_diagram(adj,50,self.sublevel_filtration_methods[j])
+                pi = torch.FloatTensor(persistence_images(pd)).to(self.device)
+                PI_list_i.append(pi)
+            PI_tensor_i = torch.stack(PI_list_i).to(self.device)
+            PI_list.append(PI_tensor_i)
 
-            witnesses = self.score_graph_layer(x, edge_index).to(self.device)
             node_embeddings = self.score_node_layer(x, edge_index).to(self.device)
             node_point_clouds = node_embeddings.view(-1, self.num_neighbors, 2).to(self.device)
             score_lifespan = torch.FloatTensor([sum_diag_from_point_cloud(node_point_clouds[i,...]) for i in range(node_point_clouds.size(0))]).to(self.device)
@@ -176,18 +149,7 @@ class GraphCNN(nn.Module):
             pooled_x.append(x)
             pooled_graph_sizes.append(x.size(0))
 
-            # witnesses complex
-            network_statistics = torch.sum(to_dense_adj(graph.edge_mat)[0,:,:], dim = 1).to(self.device)
-            witnesses_perm = topk(network_statistics, 10, batch)
-            landmarks = witnesses[witnesses_perm]
-            witness_complex = gd.EuclideanStrongWitnessComplex(witnesses=witnesses, landmarks=landmarks)
-            simplex_tree = witness_complex.create_simplex_tree(max_alpha_square = 1, limit_dimension = 1)
-            simplex_tree.compute_persistence(min_persistence=-1.)
-            witnesses_dgm = simplex_tree.persistence_intervals_in_dimension(0)[:-1,:]
-            # persistence image based on witnesses diagram
-            PI_witnesses_dgm = torch.FloatTensor(persistence_images(witnesses_dgm, normalization = False).reshape(1,-1)).to(self.device) # vectorization
-            PI_witnesses_dgms.append(PI_witnesses_dgm)
-
+        PI_concat = torch.stack(PI_list).to(self.device)
         pooled_X_concat = torch.cat(pooled_x, 0).to(self.device)
         Adj_block_idx = torch.cat(edge_mat_list, 1).to(self.device)
         Adj_block_elem = torch.ones(Adj_block_idx.shape[1]).to(self.device)
@@ -199,37 +161,9 @@ class GraphCNN(nn.Module):
             Adj_block_idx = torch.cat([Adj_block_idx, self_loop_edge], 1).to(self.device)
             Adj_block_elem = torch.cat([Adj_block_elem, elem], 0).to(self.device)
 
-        Adj_block = torch.sparse.FloatTensor(Adj_block_idx, Adj_block_elem, torch.Size([start_idx[-1],start_idx[-1]]))
+        Adj_block = torch.sparse.FloatTensor(Adj_block_idx, Adj_block_elem, torch.Size([start_idx[-1],start_idx[-1]])).to(self.device)
 
-        return Adj_block.to(self.device), pooled_X_concat, pooled_graph_sizes, PI_witnesses_dgms
-
-
-    def __preprocess_graphpool(self, batch_graph):
-        ###create sum or average pooling sparse matrix over entire nodes in each graph (num graphs x num nodes)
-        
-        start_idx = [0]
-
-        #compute the padded neighbor list
-        for i, graph in enumerate(batch_graph):
-            start_idx.append(start_idx[i] + len(graph.g))
-
-        idx = []
-        elem = []
-        for i, graph in enumerate(batch_graph):
-            ###average pooling
-            if self.graph_pooling_type == "average":
-                elem.extend([1./len(graph.g)]*len(graph.g))
-            
-            else:
-            ###sum pooling
-                elem.extend([1]*len(graph.g))
-
-            idx.extend([[i, j] for j in range(start_idx[i], start_idx[i+1], 1)])
-        elem = torch.FloatTensor(elem)
-        idx = torch.LongTensor(idx).transpose(0,1)
-        graph_pool = torch.sparse.FloatTensor(idx, elem, torch.Size([len(batch_graph), start_idx[-1]]))
-        
-        return graph_pool.to(self.device)
+        return Adj_block, pooled_X_concat, pooled_graph_sizes, PI_concat
 
     def maxpool(self, h, padded_neighbor_list):
         ###Element-wise minimum will never affect max-pooling
@@ -238,7 +172,6 @@ class GraphCNN(nn.Module):
         h_with_dummy = torch.cat([h, dummy.reshape((1, -1)).to(self.device)])
         pooled_rep = torch.max(h_with_dummy[padded_neighbor_list], dim = 1)[0]
         return pooled_rep
-
 
     def next_layer(self, h, layer, padded_neighbor_list = None, Adj_block = None, learn_eps = True):
         # pooling neighboring nodes and center nodes separately by epsilon reweighting. 
@@ -270,7 +203,13 @@ class GraphCNN(nn.Module):
         if self.neighbor_pooling_type == "max":
             padded_neighbor_list = self.__preprocess_neighbors_maxpool(batch_graph)
         else:
-            Adj_block, pooled_X_concat, pooled_graph_sizes, PI_witnesses_dgms = self.__preprocess_neighbors_sumavepool_witnesses(batch_graph)
+            Adj_block, pooled_X_concat, pooled_graph_sizes, PI_concat = self.__preprocess_neighbors_sumavepool_witnesses(batch_graph)
+        
+        PI_emb = self.cnn(PI_concat) # before cnn: [batch_size,5,50,50]; after cnn: [batch_size,8,12,12]
+        PI_decom =  FactorizedTensor.from_tensor(PI_emb, rank='same', factorization=self.tensor_decom_type).to(self.device)
+        PI_hidden = self.tensor_layer(PI_decom).to(self.device)
+        exit()
+
 
         #list of hidden representation at each layer (including input)
         hidden_rep = [pooled_X_concat]

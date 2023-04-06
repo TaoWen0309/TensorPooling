@@ -105,8 +105,6 @@ def main():
                         help='number of hidden units (default: 64)')
     parser.add_argument('--final_dropout', type=float, default=0.0,
                         help='final layer dropout (default: 0.5)')
-    parser.add_argument('--graph_pooling_type', type=str, default="sum", choices=["sum", "average"],
-                        help='Pooling for over nodes in a graph: sum or average')
     parser.add_argument('--neighbor_pooling_type', type=str, default="sum", choices=["sum", "average", "max"],
                         help='Pooling for over neighboring nodes: sum, average or max')
     parser.add_argument('--learn_eps', action="store_true",
@@ -115,6 +113,12 @@ def main():
     					help='let the input node features be the degree of nodes (heuristics for unlabeled graph)')
     parser.add_argument('--filename', type = str, default = "",
                                         help='output file')
+    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
+    					help='Methods for sublevel filtration on PDs')
+    parser.add_argument('--tensor_decom_type', type = str, default = "Tucker", choices=["Tucker","CP","TT"],
+                                        help='Tensor decomposition type: Tucker/CP/TT')
+    parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
+                                        help='Tensor layer type: TCL/TRL')
     args = parser.parse_args()
 
     #set up seeds and gpu device
@@ -129,7 +133,7 @@ def main():
 
     train_graphs, test_graphs = separate_data(graphs, args.seed, args.fold_idx)
 
-    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.graph_pooling_type, args.neighbor_pooling_type, device).to(device)
+    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.neighbor_pooling_type, args.sublevel_filtration_methods, args.tensor_decom_type, args.tensor_layer_type, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
