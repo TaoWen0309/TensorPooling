@@ -6,10 +6,35 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 import gudhi as gd
 
-# sublevel filtration on degree
-def sublevel_degree_persistence_diagram(A, max_scale):
-    nodes_degree = np.sum(A, axis=1)
+'''
+For filtration functions, I put 5 options by using 5 different network statistics. You can also run a toy example to check the output (i.e., a PD). 
+Note that, there are 2 inputs for each function - adj_matrix and max_scale, where the max_scale is a pre-defined hyperparameters and is used to replace inf value; 
+in general, you can set it to be 50 or 100 (or other large number). 
+In this case, by using these 5 filtration functions, you can generate 5 PDs. 
+Then you can feed a PD to the 'persistence_images' function and get the corresponding PI (you can set the size of PI by changing resolution; 
+in general, we consider 20x20, 50x50, or 100x100.
+'''
 
+def sublevel_persistence_diagram(A, max_scale, method):
+    
+    assert method in ['degree','betweenness','communicability','eigenvector','closeness']
+    
+    G = nx.from_numpy_array(A)
+    if method == 'degree':
+        node_features = np.sum(A, axis=1)
+    elif method == 'betweenness':
+        node_features_dict = nx.betweenness_centrality(G)
+        node_features = [i for i in node_features_dict.values()]
+    elif method == 'communicability':
+        node_features_dict = nx.communicability_betweenness_centrality(G)
+        node_features = [i for i in node_features_dict.values()]
+    elif method == 'eigenvector':
+        node_features_dict = nx.eigenvector_centrality(G)
+        node_features = [i for i in node_features_dict.values()]
+    elif method == 'closeness':
+        node_features_dict = nx.closeness_centrality(G)
+        node_features = [i for i in node_features_dict.values()]
+    
     stb = gd.SimplexTree()
     (xs, ys) = np.where(np.triu(A))
     for j in range(A.shape[0]):
@@ -19,112 +44,13 @@ def sublevel_degree_persistence_diagram(A, max_scale):
         stb.insert([x, ys[idx]], filtration=-1e10)
 
     for j in range(A.shape[0]):
-        stb.assign_filtration([j], nodes_degree[j])
+        stb.assign_filtration([j], node_features[j])
 
     stb.make_filtration_non_decreasing()
     dgm = stb.persistence()
     pd = [dgm[i][1] if dgm[i][1][1] != np.inf else (dgm[i][1][0], max_scale) for i in np.arange(0, len(dgm), 1)]
 
     return np.array(pd)
-
-
-# sublevel filtration on betweenness
-def sublevel_betweenness_persistence_diagram(A, max_scale):
-    G = nx.from_numpy_matrix(A)
-    nodes_betweenness_dict = nx.betweenness_centrality(G)
-    nodes_betweenness = [i for i in nodes_betweenness_dict.values()]
-
-    stb = gd.SimplexTree()
-    (xs, ys) = np.where(np.triu(A))
-    for j in range(A.shape[0]):
-        stb.insert([j], filtration=-1e10)
-
-    for idx, x in enumerate(xs):
-        stb.insert([x, ys[idx]], filtration=-1e10)
-
-    for j in range(A.shape[0]):
-        stb.assign_filtration([j], nodes_betweenness[j])
-
-    stb.make_filtration_non_decreasing()
-    dgm = stb.persistence()
-    pd = [dgm[i][1] if dgm[i][1][1] != np.inf else (dgm[i][1][0], max_scale) for i in np.arange(0, len(dgm), 1)]
-
-    return np.array(pd)
-
-# sublevel filtration on communicability
-def sublevel_communicability_betweenness_persistence_diagram(A, max_scale):
-    G = nx.from_numpy_matrix(A)
-    nodes_communicability_betweenness_dict = nx.communicability_betweenness_centrality(G)
-    nodes_communicability_betweenness = [i for i in nodes_communicability_betweenness_dict.values()]
-
-    stb = gd.SimplexTree()
-    (xs, ys) = np.where(np.triu(A))
-    for j in range(A.shape[0]):
-        stb.insert([j], filtration=-1e10)
-
-    for idx, x in enumerate(xs):
-        stb.insert([x, ys[idx]], filtration=-1e10)
-
-    for j in range(A.shape[0]):
-        stb.assign_filtration([j], nodes_communicability_betweenness[j])
-
-    stb.make_filtration_non_decreasing()
-    dgm = stb.persistence()
-    pd = [dgm[i][1] if dgm[i][1][1] != np.inf else (dgm[i][1][0], max_scale) for i in np.arange(0, len(dgm), 1)]
-
-    return np.array(pd)
-
-
-# sublevel filtration on eigenvector
-def sublevel_eigenvector_persistence_diagram(A, max_scale):
-    G = nx.from_numpy_matrix(A)
-    nodes_eigenvector_dict = nx.eigenvector_centrality(G)
-    nodes_eigenvector = [i for i in nodes_eigenvector_dict.values()]
-
-    stb = gd.SimplexTree()
-    (xs, ys) = np.where(np.triu(A))
-    for j in range(A.shape[0]):
-        stb.insert([j], filtration=-1e10)
-
-    for idx, x in enumerate(xs):
-        stb.insert([x, ys[idx]], filtration=-1e10)
-
-    for j in range(A.shape[0]):
-        stb.assign_filtration([j], nodes_eigenvector[j])
-
-    stb.make_filtration_non_decreasing()
-    dgm = stb.persistence()
-    pd = [dgm[i][1] if dgm[i][1][1] != np.inf else (dgm[i][1][0], max_scale) for i in np.arange(0, len(dgm), 1)]
-
-    return np.array(pd)
-
-# sublevel filtration on closeness
-def sublevel_closeness_persistence_diagram(A, max_scale):
-    G = nx.from_numpy_matrix(A)
-    nodes_closeness_dict = nx.closeness_centrality(G)
-    nodes_closeness = [i for i in nodes_closeness_dict.values()]
-
-    stb = gd.SimplexTree()
-    (xs, ys) = np.where(np.triu(A))
-    for j in range(A.shape[0]):
-        stb.insert([j], filtration=-1e10)
-
-    for idx, x in enumerate(xs):
-        stb.insert([x, ys[idx]], filtration=-1e10)
-
-    for j in range(A.shape[0]):
-        stb.assign_filtration([j], nodes_closeness[j])
-
-    stb.make_filtration_non_decreasing()
-    dgm = stb.persistence()
-    pd = [dgm[i][1] if dgm[i][1][1] != np.inf else (dgm[i][1][0], max_scale) for i in np.arange(0, len(dgm), 1)]
-
-    return np.array(pd)
-
-# an toy example
-g = nx.gnp_random_graph(n = 100, p=0.3)
-adj = nx.adjacency_matrix(g).toarray()
-pd = sublevel_communicability_betweenness_persistence_diagram(A= adj, max_scale=2.) # define max_scale by your own
 
 # persistence image
 def persistence_images(dgm, resolution = [50,50], return_raw = False, normalization = True, bandwidth = 1., power = 1.):
@@ -155,4 +81,19 @@ def persistence_images(dgm, resolution = [50,50], return_raw = False, normalizat
     else:
         norm_output = output
 
-    return norm_output
+    return np.array(norm_output)
+
+# a toy example
+g = nx.gnp_random_graph(n = 100, p=0.3)
+adj = nx.adjacency_matrix(g).toarray()
+methods = ['degree','betweenness','communicability','eigenvector','closeness']
+
+PI_set = []
+for mtd in methods:
+    pd = sublevel_persistence_diagram(adj,50,mtd)
+    pi = persistence_images(pd)
+    PI_set.append(pi)
+ 
+PI_tensor = np.concatenate((np.stack(PI_set),),axis=0)
+print('PI tensor shape {}'.format(PI_tensor.shape))
+print(PI_tensor)
