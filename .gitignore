@@ -1,4 +1,5 @@
 *.pyc
+*.out
 *.SBATCH
 # Compiled source #
 ###################
