@@ -6,4 +6,4 @@ Code Sketch for paper "****" (NIPS 2023).
 
 ### Requirements
 
-Python 3.10, Pytorch 1.11.0, gudhi 3.5.0, networkx 2.8.4, dionysus 2.0.8, numpy 1.22.4, scipy 1.8.1, and persim 0.3.1.
+Python 3.10, torch 2.0.0, gudhi 3.7.1, tensorly-torch 0.4.0, networkx 3.0, numpy 1.24.2, scipy 1.10.1, scikit-learn 1.2.2.
