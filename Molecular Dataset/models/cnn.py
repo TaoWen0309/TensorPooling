@@ -10,10 +10,14 @@ class CNN(nn.Module):
         self.features = nn.Sequential(
             nn.Conv2d(5, dim_out, kernel_size=2, stride=2),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=2)
         )
-
     def forward(self, PI):
         feature = self.features(PI)
-        # feature = feature.view(-1, self.dim_out) #B, dim_out
         return feature
+
+# compute output dim given the above kernel_size and stride
+def cnn_output_dim(dim_in):
+    tmp_dim = int((dim_in-2)/2)+1
+    output_dim = int((tmp_dim-2)/2)+1
+    return output_dim

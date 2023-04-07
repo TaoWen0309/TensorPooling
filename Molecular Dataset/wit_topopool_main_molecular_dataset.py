@@ -98,27 +98,27 @@ def main():
     parser.add_argument('--fold_idx', type=int, default=0,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=5,
-                        help='number of layers INCLUDING the input one (default: 5)')
+                        help='number of GCN layers INCLUDING the input one (default: 5)')
     parser.add_argument('--num_mlp_layers', type=int, default=2,
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
     parser.add_argument('--hidden_dim', type=int, default=8,
                         help='number of hidden units (default: 64)')
     parser.add_argument('--final_dropout', type=float, default=0.0,
                         help='final layer dropout (default: 0.5)')
-    parser.add_argument('--neighbor_pooling_type', type=str, default="sum", choices=["sum", "average", "max"],
-                        help='Pooling for over neighboring nodes: sum, average or max')
-    parser.add_argument('--learn_eps', action="store_true",
-                                        help='Whether to learn the epsilon weighting for the center nodes. Does not affect training accuracy though.')
     parser.add_argument('--degree_as_tag', action="store_true",
     					help='let the input node features be the degree of nodes (heuristics for unlabeled graph)')
     parser.add_argument('--filename', type = str, default = "",
                                         help='output file')
+    # below are new model specific arguments
     parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--tensor_decom_type', type = str, default = "Tucker", choices=["Tucker","CP","TT"],
                                         help='Tensor decomposition type: Tucker/CP/TT')
     parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
+    parser.add_argument('--PI_dim', type=int, default=50,
+                        help='PI size: PI_dim*PI_dim')
+    
     args = parser.parse_args()
 
     #set up seeds and gpu device
@@ -133,7 +133,7 @@ def main():
 
     train_graphs, test_graphs = separate_data(graphs, args.seed, args.fold_idx)
 
-    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.neighbor_pooling_type, args.sublevel_filtration_methods, args.tensor_decom_type, args.tensor_layer_type, device).to(device)
+    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_decom_type, args.tensor_layer_type, args.PI_dim, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
