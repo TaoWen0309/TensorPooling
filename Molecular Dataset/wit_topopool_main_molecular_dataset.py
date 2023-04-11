@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 from util import load_data, separate_data
-from models.witness_graphcnn import GraphCNN
+from models.witness_graphcnn import TenGCN
 
 
 criterion = nn.CrossEntropyLoss()
@@ -133,7 +133,7 @@ def main():
 
     train_graphs, test_graphs = separate_data(graphs, args.seed, args.fold_idx)
 
-    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_decom_type, args.tensor_layer_type, args.PI_dim, device).to(device)
+    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_decom_type, args.tensor_layer_type, args.PI_dim, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
