@@ -113,7 +113,7 @@ def main():
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
-    parser.add_argument('--PI_dim', type=int, default=100,
+    parser.add_argument('--PI_dim', type=int, default=50,
                         help='PI size: PI_dim*PI_dim')
     parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
