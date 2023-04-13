@@ -2,7 +2,7 @@ import gudhi as gd
 import numpy as np
 import networkx as nx
 
-def sublevel_persistence_diagram(A, max_scale, method):
+def sublevel_persistence_diagram(A, method, max_scale=50):
     
     assert method in ['degree','betweenness','communicability','eigenvector','closeness']
     
@@ -61,8 +61,10 @@ def persistence_images(dgm, resolution = [50,50], return_raw = False, normalizat
 
     output = [lw, lsum] if return_raw else Zfinal
 
-    if normalization:
-        norm_output = (output - np.min(output))/(np.max(output) - np.min(output))
+    max_output = np.max(output)
+    min_output = np.min(output)
+    if normalization and (max_output != min_output):
+        norm_output = (output - min_output)/(max_output - min_output)
     else:
         norm_output = output
 

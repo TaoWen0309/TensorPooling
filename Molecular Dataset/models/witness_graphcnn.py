@@ -5,17 +5,17 @@ from torch_geometric.nn import GCNConv, SAGEConv, GATConv, GINConv
 
 import sys
 sys.path.append("models/")
-from mlp import MLP
+from mlp import MLP, MLP_output
 from cnn import CNN, cnn_output_dim
 from diagram import sublevel_persistence_diagram, persistence_images, sum_diag_from_point_cloud
 
 import numpy as np
 import networkx as nx
 
-from tltorch import TRL, TCL, FactorizedTensor, FactorizedLinear
+from tltorch import TRL, TCL
 
 class TenGCN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, sublevel_filtration_methods, tensor_decom_type, tensor_layer_type, PI_dim, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, sublevel_filtration_methods, tensor_layer_type, PI_dim, node_pooling, device):
         '''
             num_layers: number of GCN layers (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -24,7 +24,6 @@ class TenGCN(nn.Module):
             output_dim: number of classes for prediction
             final_dropout: dropout ratio on the final linear layer
             sublevel_filtration_methods: methods for sublevel filtration on PD
-            decom_type: Tensor decomposition type, Tucker/CP/TT
             tensor_layer: Tensor layer type, TCL/TRL'
             PI_dim: int size of PI
             device: which device to use
@@ -39,17 +38,17 @@ class TenGCN(nn.Module):
         self.hidden_dim = hidden_dim
         # point clouds pooling for nodes
         self.score_node_layer = GCNConv(input_dim, self.num_neighbors * 2)
-        
-        self.tensor_decom_type = tensor_decom_type
+        self.node_pooling = node_pooling
+
         # GCN block = gcn + mlp
         self.GCNs = torch.nn.ModuleList()
         self.mlps = torch.nn.ModuleList()
         for layer in range(self.num_layers-1):
             if layer == 0:
-                self.GCNs.append(GCNConv(input_dim,hidden_dim**2))
+                self.GCNs.append(GCNConv(input_dim,hidden_dim))
             else:
-                self.GCNs.append(GCNConv(hidden_dim**2,hidden_dim**2))
-            self.mlps.append(MLP(num_mlp_layers, hidden_dim**2, hidden_dim, hidden_dim**2))
+                self.GCNs.append(GCNConv(hidden_dim**2,hidden_dim))
+            self.mlps.append(MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim**2))
         # tensor layer
         tensor_input_shape = (self.num_layers-1,hidden_dim,hidden_dim)
         tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
@@ -74,10 +73,9 @@ class TenGCN(nn.Module):
             self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
         # self.tensor_linear = FactorizedLinear(in_tensorized_features=tuple(self.tensor_hidden_shape),out_tensorized_features=self.tensor_output_shape)
 
-        # output layer
+        # output block
         self.attend = nn.Linear(2*hidden_dim, 1)
-        self.output = nn.Linear(hidden_dim**2, output_dim)
-        self.act = nn.Sigmoid()
+        self.output = MLP_output(hidden_dim,output_dim)
         self.dropout = nn.Dropout(self.final_dropout)
 
     def compute_batch_feat_PI_tensor(self, batch_graph):
@@ -96,20 +94,21 @@ class TenGCN(nn.Module):
             
             # PI tensor
             for j in range(len(self.sublevel_filtration_methods)): # 5 methods
-                pd = sublevel_persistence_diagram(adj,self.PI_dim,self.sublevel_filtration_methods[j])
-                pi = torch.FloatTensor(persistence_images(pd)).to(self.device)
+                pd = sublevel_persistence_diagram(adj,self.sublevel_filtration_methods[j])
+                pi = torch.FloatTensor(persistence_images(pd,resolution=[self.PI_dim]*2)).to(self.device)
                 PI_list_i.append(pi)
             PI_tensor_i = torch.stack(PI_list_i).to(self.device)
             PI_list.append(PI_tensor_i)
             
-            # graph pooling based on node topological scores
-            node_embeddings = self.score_node_layer(x, edge_index).to(self.device)
-            node_point_clouds = node_embeddings.view(-1, self.num_neighbors, 2).to(self.device)
-            score_lifespan = torch.FloatTensor([sum_diag_from_point_cloud(node_point_clouds[i,...]) for i in range(node_point_clouds.size(0))]).to(self.device)
-            batch = torch.LongTensor([0] * x.size(0)).to(self.device)
-            perm = topk(score_lifespan, 0.5, batch)
-            x = x[perm]
-            edge_index, _ = filter_adj(edge_index, edge_attr, perm, num_nodes=graph.node_features.size(0))
+            if self.node_pooling:
+                # graph pooling based on node topological scores
+                node_embeddings = self.score_node_layer(x, edge_index).to(self.device)
+                node_point_clouds = node_embeddings.view(-1, self.num_neighbors, 2).to(self.device)
+                score_lifespan = torch.FloatTensor([sum_diag_from_point_cloud(node_point_clouds[i,...]) for i in range(node_point_clouds.size(0))]).to(self.device)
+                batch = torch.LongTensor([0] * x.size(0)).to(self.device)
+                perm = topk(score_lifespan, 0.5, batch)
+                x = x[perm]
+                edge_index, _ = filter_adj(edge_index, edge_attr, perm, num_nodes=graph.node_features.size(0))
             
             start_idx.append(start_idx[i] + x.size(0))
             edge_mat_list.append(edge_index + start_idx[i])
@@ -133,10 +132,8 @@ class TenGCN(nn.Module):
         ## PI block
         # CNN
         PI_emb = self.cnn(PI_concat) # before cnn: [batch_size,5,PI_dim,PI_dim]; after cnn: [batch_size,hidden_dim,cnn_output_shape,cnn_output_shape]
-        # tensor decomposition
-        PI_decom =  FactorizedTensor.from_tensor(PI_emb, rank='same', factorization=self.tensor_decom_type).to(self.device) #[batch_size,hidden_dim,,cnn_output_shape,cnn_output_shape]
         # tensor layer
-        PI_hidden = self.PI_tensor_layer(PI_decom).to(self.device) # [batch_size,hidden_dim,hidden_dim,hidden_dim]
+        PI_hidden = self.PI_tensor_layer(PI_emb).to(self.device) # [batch_size,hidden_dim,hidden_dim,hidden_dim]
 
         ## GCN block
         hidden_rep = []
@@ -156,8 +153,7 @@ class TenGCN(nn.Module):
             # current graph GCN tensor
             cur_node_embeddings = node_embeddings[g_i] # (n,self.num_layers-1,hidden_dim**2)
             cur_node_embeddings = cur_node_embeddings.view(-1,self.num_layers-1,self.hidden_dim,self.hidden_dim) # (n,self.num_layers-1,hidden_dim,hidden_dim)
-            cur_node_embeddings_decom =  FactorizedTensor.from_tensor(cur_node_embeddings, rank='same', factorization=self.tensor_decom_type).to(self.device)
-            cur_node_embeddings_hidden = self.GCN_tensor_layer(cur_node_embeddings_decom).to(self.device) # (n,hidden_dim,hidden_dim,hidden_dim)
+            cur_node_embeddings_hidden = self.GCN_tensor_layer(cur_node_embeddings).to(self.device) # (n,hidden_dim,hidden_dim,hidden_dim)
             cur_graph_tensor_hideen = torch.mean(cur_node_embeddings_hidden,dim=0) # (hidden_dim,hidden_dim,hidden_dim)
             # concat with PI tensor
             cur_PI_tensor_hidden = PI_hidden[g_i] # (hidden_dim,hidden_dim,hidden_dim)
@@ -168,15 +164,8 @@ class TenGCN(nn.Module):
         # attention on the concat dim
         batch_graph_tensor = batch_graph_tensor.transpose(1,3) # (batch_size,hidden_dim,hidden_dim,hidden_dim*2)
         batch_graph_attn = self.attend(batch_graph_tensor).squeeze() # (batch_size,hidden_dim,hidden_dim)
-        # decomposition and reconstruction
-        batch_graph_decom = FactorizedTensor.from_tensor(batch_graph_attn, rank='same', factorization=self.tensor_decom_type).to(self.device)
-        batch_graph_decom = batch_graph_decom.normal_(mean=0, std=1)
-        batch_graph_recons = batch_graph_decom.to_tensor()
-        batch_graph_flat = batch_graph_recons.contiguous().view(-1,self.hidden_dim**2) # (batch_size,hidden_dim**2)
         # output linear transformation
-        
-        batch_graph_output = self.output(batch_graph_flat) # (batch_size,output_dim)
-        score = self.act(batch_graph_output)
+        score = self.output(batch_graph_attn) # (batch_size,output_dim)
         score = self.dropout(score)
 
         return score
