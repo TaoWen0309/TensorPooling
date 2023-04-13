@@ -66,15 +66,19 @@ class TenGCN(nn.Module):
         self.PI_dim = PI_dim
         tensor_input_shape = (hidden_dim,cnn_output_shape,cnn_output_shape)
         tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
-        # self.tensor_output_shape = (2,2)
         if tensor_layer_type == 'TCL':
             self.PI_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
             self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
-        # self.tensor_linear = FactorizedLinear(in_tensorized_features=tuple(self.tensor_hidden_shape),out_tensorized_features=self.tensor_output_shape)
 
         # output block
         self.attend = nn.Linear(2*hidden_dim, 1)
+        tensor_input_shape = (2*hidden_dim,hidden_dim,hidden_dim)
+        tensor_hidden_shape = [2*hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
+        if tensor_layer_type == 'TCL':
+            self.output_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
+        elif tensor_layer_type == 'TRL':
+            self.output_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
         self.output = MLP_output(hidden_dim,output_dim)
         self.dropout = nn.Dropout(self.final_dropout)
 
@@ -162,9 +166,8 @@ class TenGCN(nn.Module):
         
         ## output block
         # attention on the concat dim
-        batch_graph_tensor = batch_graph_tensor.transpose(1,3) # (batch_size,hidden_dim,hidden_dim,hidden_dim*2)
+        batch_graph_tensor = self.output_tensor_layer(batch_graph_tensor).transpose(1,3) # (batch_size,hidden_dim,hidden_dim,hidden_dim*2)
         batch_graph_attn = self.attend(batch_graph_tensor).squeeze() # (batch_size,hidden_dim,hidden_dim)
-        # output linear transformation
         score = self.output(batch_graph_attn) # (batch_size,output_dim)
         score = self.dropout(score)
 

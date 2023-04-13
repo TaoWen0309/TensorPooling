@@ -88,9 +88,9 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=350,
+    parser.add_argument('--epochs', type=int, default=300,
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.1,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=9,
                         help='random seed for splitting the dataset into 10 (default: 0)')
@@ -113,9 +113,9 @@ def main():
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
-    parser.add_argument('--PI_dim', type=int, default=50,
+    parser.add_argument('--PI_dim', type=int, default=100,
                         help='PI size: PI_dim*PI_dim')
-    parser.add_argument('--node_pooling', action="store_true",
+    parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
     args = parser.parse_args()
 
@@ -133,7 +133,7 @@ def main():
     model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].node_features.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_layer_type, args.PI_dim, args.node_pooling, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
