@@ -90,7 +90,7 @@ def main():
                         help='number of iterations per each epoch (default: 50)')
     parser.add_argument('--epochs', type=int, default=300,
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.1,
+    parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=9,
                         help='random seed for splitting the dataset into 10 (default: 0)')
@@ -100,7 +100,7 @@ def main():
                         help='number of GCN layers INCLUDING the input one (default: 5)')
     parser.add_argument('--num_mlp_layers', type=int, default=2,
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
-    parser.add_argument('--hidden_dim', type=int, default=16,
+    parser.add_argument('--hidden_dim', type=int, default=32,
                         help='number of hidden units (default: 64)')
     parser.add_argument('--final_dropout', type=float, default=0.5,
                         help='final layer dropout (default: 0.5)')
@@ -114,7 +114,7 @@ def main():
     parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
     parser.add_argument('--PI_dim', type=int, default=50,
-                        help='PI size: PI_dim*PI_dim')
+                        help='PI size: PI_dim * PI_dim')
     parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
     args = parser.parse_args()
