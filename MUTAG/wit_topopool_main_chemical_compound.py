@@ -90,13 +90,13 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=20,
+    parser.add_argument('--epochs', type=int, default=30,
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float,  default=0.001,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=0,
+    parser.add_argument('--fold_idx', type=int, default=9,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -155,7 +155,7 @@ def main():
                 f.write("\n")
 
     with open('acc_results.txt', 'a+') as f:
-        f.write(str(args.dataset) + ' ' + str(max_acc) + '\n')
+        f.write(str(args.fold_idx) + ': ' + str(max_acc) + '\n')
     
 
 if __name__ == '__main__':
