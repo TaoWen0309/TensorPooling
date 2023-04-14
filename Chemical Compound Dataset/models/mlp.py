@@ -50,3 +50,29 @@ class MLP(nn.Module):
                 h = F.relu(self.batch_norms[layer](self.linears[layer](h)))
             # Output layer(no activation)
             return self.linears[self.num_layers - 1](h)
+        
+class MLP_output(nn.Module):
+    def __init__(self, hidden_dim, output_dim):
+        '''
+            hidden_dim: dimensionality of hidden features
+            output_dim: number of classes for prediction
+            device: which device to use
+        '''
+    
+        super(MLP_output, self).__init__()
+
+        self.linears = torch.nn.ModuleList()
+        self.batch_norms = torch.nn.ModuleList()
+        
+        # no hidden layers
+        self.linears.append(nn.Linear(hidden_dim, 1))
+        self.linears.append(nn.Linear(hidden_dim, output_dim))
+        self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+        self.batch_norms.append(nn.BatchNorm1d(output_dim))
+
+        self.act = nn.Sigmoid()
+
+    def forward(self, h):
+        h = F.relu(self.batch_norms[0](self.linears[0](h).squeeze()))
+        h = self.act(self.batch_norms[1](self.linears[1](h)))
+        return h

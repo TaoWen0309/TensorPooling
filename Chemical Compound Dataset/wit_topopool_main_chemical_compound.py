@@ -9,11 +9,10 @@ from torch_geometric.datasets import TUDataset
 from tqdm import tqdm
 
 from util import separate_TUDataset
-from models.witness_graphcnn import GraphCNN
+from models.witness_graphcnn import TenGCN
 
 criterion = nn.CrossEntropyLoss()
 
-# training for an epoch
 def train(args, model, device, train_graphs, optimizer, epoch):
     model.train()
 
@@ -22,27 +21,26 @@ def train(args, model, device, train_graphs, optimizer, epoch):
 
     loss_accum = 0
     for pos in pbar:
-        # batch graph
         selected_idx = np.random.permutation(len(train_graphs))[:args.batch_size]
+
         batch_graph = [train_graphs[idx] for idx in selected_idx]
         output = model(batch_graph)
 
         labels = torch.LongTensor([graph.y for graph in batch_graph]).to(device)
 
-        # compute loss
+        #compute loss
         loss = criterion(output, labels)
 
-        # backprop
+        #backprop
         if optimizer is not None:
             optimizer.zero_grad()
             loss.backward()         
-            optimizer.step()
-        
-        # accumulate loss
+            optimizer.step()      
+
         loss = loss.detach().cpu().numpy()
         loss_accum += loss
 
-        # report
+        #report
         pbar.set_description('epoch: %d' % (epoch))
 
     average_loss = loss_accum/total_iters
@@ -50,7 +48,7 @@ def train(args, model, device, train_graphs, optimizer, epoch):
     
     return average_loss
 
-# minibatch prediction on test graphs
+###pass data to model with minibatch during testing to avoid memory overflow (does not perform backpropagation)
 def pass_data_iteratively(model, graphs, minibatch_size = 64):
     model.eval()
     output = []
@@ -62,16 +60,15 @@ def pass_data_iteratively(model, graphs, minibatch_size = 64):
         output.append(model([graphs[j] for j in sampled_idx]).detach())
     return torch.cat(output, 0)
 
-# eval on both train and test graphs
 def test(model, device, train_graphs, test_graphs):
     model.eval()
-    # train graphs
+
     output = pass_data_iteratively(model, train_graphs)
     pred = output.max(1, keepdim=True)[1]
     labels = torch.LongTensor([graph.y for graph in train_graphs]).to(device)
     correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
     acc_train = correct / float(len(train_graphs))
-    # test graphs
+
     output = pass_data_iteratively(model, test_graphs)
     pred = output.max(1, keepdim=True)[1]
     labels = torch.LongTensor([graph.y for graph in test_graphs]).to(device)
@@ -85,42 +82,43 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="COX2",
+    parser.add_argument('--dataset', type=str, default="MUTAG",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
-    parser.add_argument('--batch_size', type=int, default=16,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
-                        help='number of iterations(batches) per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=350,
+                        help='number of iterations per each epoch (default: 50)')
+    parser.add_argument('--epochs', type=int, default=100,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=9,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    # 10 folds(partitions), which one to use
     parser.add_argument('--fold_idx', type=int, default=0,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
-    # number of layers in the NN, i.e. pooling layers after topological pooling
-    parser.add_argument('--num_layers', type=int, default=3,
-                        help='number of layers INCLUDING the input one (default: 5)')
+    parser.add_argument('--num_layers', type=int, default=5,
+                        help='number of GCN layers INCLUDING the input one (default: 5)')
     parser.add_argument('--num_mlp_layers', type=int, default=2,
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
     parser.add_argument('--hidden_dim', type=int, default=8,
-                        help='number of hidden units for MLP (default: 64)')
-    parser.add_argument('--final_dropout', type=float, default=0.5,
+                        help='number of hidden units (default: 64)')
+    parser.add_argument('--final_dropout', type=float, default=0.3,
                         help='final layer dropout (default: 0.5)')
-    parser.add_argument('--graph_pooling_type', type=str, default="sum", choices=["sum", "average"],
-                        help='Pooling for over nodes in a graph: sum or average')
-    parser.add_argument('--neighbor_pooling_type', type=str, default="sum", choices=["sum", "average", "max"],
-                        help='Pooling for over neighboring nodes: sum, average or max')
-    parser.add_argument('--learn_eps', action="store_true",
-                                        help='Whether to learn the epsilon weighting for the center nodes. Does not affect training accuracy though.')
     parser.add_argument('--degree_as_tag', action="store_true",
-    					help='let the input node tags be the degree of nodes (heuristics for unlabeled graph)')
+    					help='let the input node features be the degree of nodes (heuristics for unlabeled graph)')
     parser.add_argument('--filename', type = str, default = "",
                                         help='output file')
+    # below are new model specific arguments
+    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
+    					help='Methods for sublevel filtration on PDs')
+    parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
+                                        help='Tensor layer type: TCL/TRL')
+    parser.add_argument('--PI_dim', type=int, default=20,
+                        help='PI size: PI_dim * PI_dim')
+    parser.add_argument('--node_pooling', action="store_false",
+    					help='node pooling based on node scores')
     args = parser.parse_args()
 
     #set up seeds and gpu device
@@ -136,10 +134,10 @@ def main():
 
     train_graphs, test_graphs = separate_TUDataset(graphs, args.seed, args.fold_idx)
 
-    model = GraphCNN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.learn_eps, args.graph_pooling_type, args.neighbor_pooling_type, device).to(device)
+    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_layer_type, args.PI_dim, args.node_pooling, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.8)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.6)
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
