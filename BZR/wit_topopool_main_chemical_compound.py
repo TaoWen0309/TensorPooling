@@ -96,7 +96,7 @@ def main():
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=4,
+    parser.add_argument('--fold_idx', type=int, default=5,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -137,7 +137,7 @@ def main():
     model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.sublevel_filtration_methods, args.tensor_layer_type, args.PI_dim, args.node_pooling, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
