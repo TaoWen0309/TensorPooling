@@ -2,7 +2,7 @@
 
 ### Tensor Topological Pooling
 
-Code Sketch for paper "****" (NIPS 2023).
+Code for paper "****" (NIPS 2023).
 
 ### Requirements
 
