@@ -63,11 +63,11 @@ def pass_data_iteratively(model, graphs, minibatch_size = 64):
 def test(model, device, train_graphs, test_graphs):
     model.eval()
 
-    output = pass_data_iteratively(model, train_graphs)
-    pred = output.max(1, keepdim=True)[1]
-    labels = torch.LongTensor([graph.y for graph in train_graphs]).to(device)
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    acc_train = correct / float(len(train_graphs))
+    # output = pass_data_iteratively(model, train_graphs)
+    # pred = output.max(1, keepdim=True)[1]
+    # labels = torch.LongTensor([graph.y for graph in train_graphs]).to(device)
+    # correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+    # acc_train = correct / float(len(train_graphs))
 
     output = pass_data_iteratively(model, test_graphs)
     pred = output.max(1, keepdim=True)[1]
@@ -75,8 +75,9 @@ def test(model, device, train_graphs, test_graphs):
     correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
     acc_test = correct / float(len(test_graphs))
 
-    print("accuracy train: %f test: %f" % (acc_train, acc_test))
-    return acc_train, acc_test
+    # print("accuracy train: %f test: %f" % (acc_train, acc_test))
+    print("accuracy test: %f" % acc_test)
+    return acc_test
 
 def main():
     # Training settings
@@ -96,13 +97,13 @@ def main():
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=0,
+    parser.add_argument('--fold_idx', type=int, default=1,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
     parser.add_argument('--num_mlp_layers', type=int, default=2,
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
-    parser.add_argument('--hidden_dim', type=int, default=64,
+    parser.add_argument('--hidden_dim', type=int, default=4,
                         help='number of hidden units (default: 64)')
     parser.add_argument('--final_dropout', type=float, default=0.5,
                         help='final layer dropout (default: 0.5)')
@@ -113,11 +114,11 @@ def main():
     # below are new model specific arguments
     parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
-    parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
+    parser.add_argument('--tensor_layer_type', type = str, default = "TRL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
-    parser.add_argument('--PI_dim', type=int, default=50,
+    parser.add_argument('--PI_dim', type=int, default=20,
                         help='PI size: PI_dim * PI_dim')
-    parser.add_argument('--node_pooling', action="store_false",
+    parser.add_argument('--node_pooling', action="store_true",
     					help='node pooling based on node scores')
     args = parser.parse_args()
 
@@ -145,17 +146,19 @@ def main():
 
         avg_loss = train(args, model, device, train_graphs, optimizer, epoch)
         scheduler.step() # only takes effect at the specified step_size
-        acc_train, acc_test = test(model, device, train_graphs, test_graphs)
+        # acc_train, acc_test = test(model, device, train_graphs, test_graphs)
+        acc_test = test(model, device, train_graphs, test_graphs)
 
         max_acc = max(max_acc, acc_test)
 
         if not args.filename == "":
             with open(args.filename, 'a+') as f:
-                f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
+                # f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
+                f.write("%f %f %f" % (avg_loss, acc_test))
                 f.write("\n")
 
     with open('acc_results.txt', 'a+') as f:
-        f.write(str(args.dataset) + ' ' + str(max_acc) + '\n')
+        f.write(str(args.fold_idx) + ' ' + str(max_acc) + '\n')
     
 
 if __name__ == '__main__':
