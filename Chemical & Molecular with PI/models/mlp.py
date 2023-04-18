@@ -61,18 +61,14 @@ class MLP_output(nn.Module):
     
         super(MLP_output, self).__init__()
 
-        self.linears = torch.nn.ModuleList()
-        self.batch_norms = torch.nn.ModuleList()
-        
-        # no hidden layers
-        self.linears.append(nn.Linear(hidden_dim, 1))
-        self.linears.append(nn.Linear(hidden_dim, output_dim))
-        self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-        self.batch_norms.append(nn.BatchNorm1d(output_dim))
-
-        self.act = nn.Sigmoid()
+        self.linear = nn.Linear(hidden_dim,1)
+        self.output = nn.Sequential(nn.BatchNorm1d(hidden_dim),
+                                    nn.ReLU(),
+                                    nn.Linear(hidden_dim, output_dim),
+                                    nn.BatchNorm1d(output_dim),
+                                    nn.Softmax(dim=1))
 
     def forward(self, h):
-        h = F.relu(self.batch_norms[0](self.linears[0](h).squeeze()))
-        h = self.act(self.batch_norms[1](self.linears[1](h)))
+        h = self.linear(h).squeeze()
+        h = self.output(h)
         return h
