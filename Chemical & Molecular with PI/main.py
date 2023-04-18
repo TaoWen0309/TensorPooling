@@ -9,7 +9,7 @@ from torch_geometric.datasets import TUDataset
 from tqdm import tqdm
 
 from util import separate_TUDataset, compute_PI_tensor
-from models.witness_graphcnn import TenGCN
+from models.tensorgcn import TenGCN
 
 criterion = nn.CrossEntropyLoss()
 
