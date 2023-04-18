@@ -79,7 +79,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="MUTAG",
+    parser.add_argument('--dataset', type=str, default="PTC_FM",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -131,9 +131,9 @@ def main():
 
     ## NOTE: compute graph PI tensor if necessary
     # PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
-    # torch.save(PIs,'{}_{}_PI'.format(args.dataset,args.PI_dim))
+    # torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
     ## load pre-computed PIs
-    PIs = torch.load('{}_{}_PI'.format(args.dataset,args.PI_dim)).to(device)
+    PIs = torch.load('{}_{}_PI.pt'.format(args.dataset,args.PI_dim)).to(device)
     
     train_graphs, train_PIs, test_graphs, test_PIs = separate_TUDataset(graphs, PIs, args.seed, args.fold_idx)
     model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, device).to(device)
