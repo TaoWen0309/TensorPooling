@@ -87,19 +87,19 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=50,
+    parser.add_argument('--epochs', type=int, default=30,
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.001,
+    parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=0,
+    parser.add_argument('--fold_idx', type=int, default=1,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
     parser.add_argument('--num_mlp_layers', type=int, default=2,
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
-    parser.add_argument('--hidden_dim', type=int, default=4,
+    parser.add_argument('--hidden_dim', type=int, default=32,
                         help='number of hidden units (default: 64)')
     parser.add_argument('--final_dropout', type=float, default=0.5,
                         help='final layer dropout (default: 0.5)')
@@ -108,7 +108,7 @@ def main():
     parser.add_argument('--filename', type = str, default = "",
                                         help='output file')
     # below are new model specific arguments
-    parser.add_argument('--tensor_layer_type', type = str, default = "TRL", choices=["TCL","TRL"],
+    parser.add_argument('--tensor_layer_type', type = str, default = "TCL", choices=["TCL","TRL"],
                                         help='Tensor layer type: TCL/TRL')
     parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
@@ -137,7 +137,7 @@ def main():
     print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
     
     train_graphs, train_PIs, test_graphs, test_PIs = separate_TUDataset(graphs, PIs, args.seed, args.fold_idx)
-    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, device).to(device)
+    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, args.sublevel_filtration_methods, device).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 

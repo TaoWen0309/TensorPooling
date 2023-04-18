@@ -12,7 +12,7 @@ from diagram import sum_diag_from_point_cloud
 from tltorch import TRL, TCL
 
 class TenGCN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, tensor_layer_type, node_pooling, PI_dim, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, tensor_layer_type, node_pooling, PI_dim, sublevel_filtration_methods, device):
         '''
             num_layers: number of GCN layers (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -22,6 +22,7 @@ class TenGCN(nn.Module):
             final_dropout: dropout ratio on the final linear layer
             tensor_layer: Tensor layer type, TCL/TRL'
             PI_dim: int size of PI
+            sublevel_filtration_methods: methods to generate PD
             device: which device to use
         '''
 
@@ -55,7 +56,7 @@ class TenGCN(nn.Module):
 
         # PI tensor block
         # CNN
-        self.cnn = CNN(hidden_dim)
+        self.cnn = CNN(len(sublevel_filtration_methods),hidden_dim)
         cnn_output_shape = cnn_output_dim(PI_dim)
         # tensor layer
         tensor_input_shape = (hidden_dim,cnn_output_shape,cnn_output_shape)

@@ -4,16 +4,15 @@ import torch.nn as nn
 
 # apply to PI
 class CNN(nn.Module):
-    def __init__(self, dim_out):
+    def __init__(self, dim_in, hidden_dim):
         super(CNN, self).__init__()
-        self.dim_out = dim_out
-        self.features = nn.Sequential(
-            nn.Conv2d(5, dim_out, kernel_size=2, stride=2),
+        self.cnn = nn.Sequential(
+            nn.Conv2d(dim_in, hidden_dim, kernel_size=2, stride=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
     def forward(self, PI):
-        feature = self.features(PI)
+        feature = self.cnn(PI)
         return feature
 
 # compute output dim given the above kernel_size and stride
