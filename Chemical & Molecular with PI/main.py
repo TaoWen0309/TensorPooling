@@ -134,6 +134,7 @@ def main():
     # torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
     ## load pre-computed PIs
     PIs = torch.load('{}_{}_PI.pt'.format(args.dataset,args.PI_dim)).to(device)
+    print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
     
     train_graphs, train_PIs, test_graphs, test_PIs = separate_TUDataset(graphs, PIs, args.seed, args.fold_idx)
     model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, device).to(device)
