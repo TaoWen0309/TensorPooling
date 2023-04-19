@@ -89,11 +89,11 @@ def main():
                         help='number of iterations per each epoch (default: 50)')
     parser.add_argument('--epochs', type=int, default=30,
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.01,
+    parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=1,
+    parser.add_argument('--fold_idx', type=int, default=7,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -139,7 +139,7 @@ def main():
     train_graphs, train_PIs, test_graphs, test_PIs = separate_TUDataset(graphs, PIs, args.seed, args.fold_idx)
     model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, args.sublevel_filtration_methods, device).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     max_acc = 0.0
     for epoch in range(1, args.epochs + 1):
