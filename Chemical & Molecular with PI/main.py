@@ -79,7 +79,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="PTC_FM",
+    parser.add_argument('--dataset', type=str, default="PTC_FR",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -93,7 +93,7 @@ def main():
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=7,
+    parser.add_argument('--fold_idx', type=int, default=9,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
