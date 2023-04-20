@@ -229,7 +229,7 @@ def sublevel_persistence_diagram(A, method, max_scale=50):
         node_features_dict = nx.communicability_betweenness_centrality(G)
         node_features = [i for i in node_features_dict.values()]
     elif method == 'eigenvector':
-        node_features_dict = nx.eigenvector_centrality(G,max_iter=1000)
+        node_features_dict = nx.eigenvector_centrality(G,max_iter=10000)
         node_features = [i for i in node_features_dict.values()]
     elif method == 'closeness':
         node_features_dict = nx.closeness_centrality(G)
@@ -290,7 +290,7 @@ def compute_PI_tensor(graph_list,PI_dim,sublevel_filtration_methods=['degree','b
             adj = nx.adjacency_matrix(to_networkx(graph)).todense()
             PI_list_i = [] 
             # PI tensor
-            for j in range(len(sublevel_filtration_methods)): # 5 methods
+            for j in range(len(sublevel_filtration_methods)):
                 pd = sublevel_persistence_diagram(adj,sublevel_filtration_methods[j])
                 pi = torch.FloatTensor(persistence_images(pd,resolution=[PI_dim]*2))
                 PI_list_i.append(pi)

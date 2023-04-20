@@ -79,7 +79,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="PTC_MM",
+    parser.add_argument('--dataset', type=str, default="DD",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -87,13 +87,13 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=20,
+    parser.add_argument('--epochs', type=int, default=30,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=9,
+    parser.add_argument('--fold_idx', type=int, default=0,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -101,7 +101,7 @@ def main():
                         help='number of layers for MLP EXCLUDING the input one (default: 2). 1 means linear model.')
     parser.add_argument('--hidden_dim', type=int, default=32,
                         help='number of hidden units (default: 64)')
-    parser.add_argument('--final_dropout', type=float, default=0.6,
+    parser.add_argument('--final_dropout', type=float, default=0.5,
                         help='final layer dropout (default: 0.5)')
     parser.add_argument('--degree_as_tag', action="store_true",
     					help='let the input node features be the degree of nodes (heuristics for unlabeled graph)')
@@ -112,6 +112,9 @@ def main():
                                         help='Tensor layer type: TCL/TRL')
     parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
+    # NOTE
+    # PROTEINS: ['degree','betweenness','closeness']
+    # ENZYMES: ['degree','betweenness','eigenvector','closeness']
     parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--PI_dim', type=int, default=50,
@@ -130,9 +133,10 @@ def main():
     num_classes = graphs.num_classes
 
     ## NOTE: compute graph PI tensor if necessary
-    # PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
-    # torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
-    ## load pre-computed PIs
+    PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
+    torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
+    exit(0)
+    # load pre-computed PIs
     PIs = torch.load('{}_{}_PI.pt'.format(args.dataset,args.PI_dim)).to(device)
     print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
     
