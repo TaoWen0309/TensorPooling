@@ -6,7 +6,7 @@ import torch.optim as optim
 import numpy as np
 from torch_geometric.datasets import TUDataset
 
-from tqdm import tqdm
+from tqdm import trange
 
 from util import separate_TUDataset, compute_PI_tensor
 from models.tensorgcn import TenGCN
@@ -17,7 +17,7 @@ def train(args, model, device, train_graphs, train_PIs, optimizer, epoch):
     model.train()
 
     total_iters = args.iters_per_epoch
-    pbar = tqdm(range(total_iters), unit='batch')
+    pbar = trange(total_iters, unit='batch')
 
     loss_accum = 0
     for pos in pbar:
@@ -79,7 +79,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="DD",
+    parser.add_argument('--dataset', type=str, default="ENZYMES",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -93,7 +93,7 @@ def main():
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=0,
+    parser.add_argument('--fold_idx', type=int, default=9,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -115,7 +115,7 @@ def main():
     # NOTE
     # PROTEINS: ['degree','betweenness','closeness']
     # ENZYMES: ['degree','betweenness','eigenvector','closeness']
-    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
+    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--PI_dim', type=int, default=50,
                         help='PI size: PI_dim * PI_dim')
@@ -133,9 +133,9 @@ def main():
     num_classes = graphs.num_classes
 
     ## NOTE: compute graph PI tensor if necessary
-    PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
-    torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
-    exit(0)
+    # PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
+    # torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
+    # exit(0)
     # load pre-computed PIs
     PIs = torch.load('{}_{}_PI.pt'.format(args.dataset,args.PI_dim)).to(device)
     print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
