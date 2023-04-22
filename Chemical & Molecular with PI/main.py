@@ -81,7 +81,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="DD",
+    parser.add_argument('--dataset', type=str, default="DHFR",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -118,7 +118,7 @@ def main():
     # PROTEINS: ['degree','betweenness','closeness']
     # ENZYMES: ['degree','betweenness','eigenvector','closeness']
     # DD: ['degree','betweenness','eigenvector','closeness']
-    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','closeness','eigenvector'],
+    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','closeness','eigenvector'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--PI_dim', type=int, default=50,
                         help='PI size: PI_dim * PI_dim')
