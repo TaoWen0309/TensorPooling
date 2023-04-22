@@ -60,20 +60,22 @@ def pass_data_iteratively(model, graphs, PIs, minibatch_size = 64):
 def test(model, device, train_graphs, train_PIs, test_graphs, test_PIs):
     model.eval()
 
-    output = pass_data_iteratively(model, train_graphs, train_PIs)
-    pred = output.max(1, keepdim=True)[1]
-    labels = torch.LongTensor([graph.y for graph in train_graphs]).to(device)
-    correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
-    acc_train = correct / float(len(train_graphs))
+    # output = pass_data_iteratively(model, train_graphs, train_PIs)
+    # pred = output.max(1, keepdim=True)[1]
+    # labels = torch.LongTensor([graph.y for graph in train_graphs]).to(device)
+    # correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
+    # acc_train = correct / float(len(train_graphs))
 
     output = pass_data_iteratively(model, test_graphs, test_PIs)
     pred = output.max(1, keepdim=True)[1]
     labels = torch.LongTensor([graph.y for graph in test_graphs]).to(device)
     correct = pred.eq(labels.view_as(pred)).sum().cpu().item()
     acc_test = correct / float(len(test_graphs))
-
-    print("accuracy train: %f test: %f" % (acc_train, acc_test))
-    return acc_train, acc_test
+    
+    print("accuracy test: %f" % acc_test)
+    return acc_test
+    # print("accuracy train: %f test: %f" % (acc_train, acc_test))
+    # return acc_train, acc_test
 
 def main():
     # Training settings
@@ -83,11 +85,11 @@ def main():
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=16,
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=30,
+    parser.add_argument('--epochs', type=int, default=15,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
@@ -136,7 +138,7 @@ def main():
     ## NOTE: compute graph PI tensor if necessary
     # PIs = compute_PI_tensor(graphs,args.PI_dim,args.sublevel_filtration_methods)
     # torch.save(PIs,'{}_{}_PI.pt'.format(args.dataset,args.PI_dim))
-    # load pre-computed PIs
+    ## load pre-computed PIs
     PIs = torch.load('{}_{}_PI.pt'.format(args.dataset,args.PI_dim)).to(device)
     print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
     
@@ -151,13 +153,15 @@ def main():
 
         avg_loss = train(args, model, device, train_graphs, train_PIs, optimizer, epoch)
         scheduler.step()
-        acc_train, acc_test = test(model, device, train_graphs, train_PIs, test_graphs, test_PIs)
+        # acc_train, acc_test = test(model, device, train_graphs, train_PIs, test_graphs, test_PIs)
+        acc_test = test(model, device, train_graphs, train_PIs, test_graphs, test_PIs)
 
         max_acc = max(max_acc, acc_test)
 
         if not args.filename == "":
             with open(args.filename, 'a+') as f:
-                f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
+                # f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
+                f.write("%f %f %f" % (avg_loss, acc_test))
                 f.write("\n")
 
     with open('acc_results.txt', 'a+') as f:
