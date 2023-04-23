@@ -81,7 +81,7 @@ def main():
     # Training settings
     # Note: Hyper-parameters need to be tuned in order to obtain results reported in the paper.
     parser = argparse.ArgumentParser(description='PyTorch graph convolutional neural net for whole-graph classification')
-    parser.add_argument('--dataset', type=str, default="DHFR",
+    parser.add_argument('--dataset', type=str, default="DD",
                         help='name of dataset (default: MUTAG)')
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
@@ -89,13 +89,13 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=15,
+    parser.add_argument('--epochs', type=int, default=20,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
     parser.add_argument('--seed', type=int, default=0,
                         help='random seed for splitting the dataset into 10 (default: 0)')
-    parser.add_argument('--fold_idx', type=int, default=0,
+    parser.add_argument('--fold_idx', type=int, default=7,
                         help='the index of fold in 10-fold validation. Should be less then 10.')
     parser.add_argument('--num_layers', type=int, default=3,
                         help='number of GCN layers INCLUDING the input one (default: 5)')
@@ -118,7 +118,7 @@ def main():
     # PROTEINS: ['degree','betweenness','closeness']
     # ENZYMES: ['degree','betweenness','eigenvector','closeness']
     # DD: ['degree','betweenness','eigenvector','closeness']
-    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','closeness','eigenvector'],
+    parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--PI_dim', type=int, default=50,
                         help='PI size: PI_dim * PI_dim')
