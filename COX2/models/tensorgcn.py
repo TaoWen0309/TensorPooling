@@ -27,7 +27,7 @@ class TenGCN(nn.Module):
         '''
 
         super(TenGCN, self).__init__()
-        decomp = 'Tucker'
+        decomp = 'TT'
         
         self.final_dropout = final_dropout
         self.device = device
