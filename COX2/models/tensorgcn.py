@@ -27,7 +27,6 @@ class TenGCN(nn.Module):
         '''
 
         super(TenGCN, self).__init__()
-        decomp = 'TT'
         
         self.final_dropout = final_dropout
         self.device = device
@@ -53,7 +52,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.GCN_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.GCN_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=decomp)
+            self.GCN_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
 
         # PI tensor block
         # CNN
@@ -65,7 +64,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.PI_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=decomp)
+            self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
 
         # output block
         self.attend = nn.Linear(2*hidden_dim, 1)
@@ -74,7 +73,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.output_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.output_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=decomp)
+            self.output_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
         self.output = MLP_output(hidden_dim,output_dim)
         self.dropout = nn.Dropout(self.final_dropout)
 
