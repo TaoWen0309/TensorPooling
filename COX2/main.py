@@ -7,6 +7,7 @@ import numpy as np
 from torch_geometric.datasets import TUDataset
 
 from tqdm import trange
+from time import time
 
 from util import separate_TUDataset, compute_PI_tensor
 from models.tensorgcn import TenGCN
@@ -89,7 +90,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=50,
+    parser.add_argument('--epochs', type=int, default=500,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
@@ -114,11 +115,12 @@ def main():
                                         help='Tensor layer type: TCL/TRL')
     parser.add_argument('--node_pooling', action="store_false",
     					help='node pooling based on node scores')
-
     parser.add_argument('--sublevel_filtration_methods', nargs='+', type=str, default=['degree','betweenness','communicability','eigenvector','closeness'],
     					help='Methods for sublevel filtration on PDs')
     parser.add_argument('--PI_dim', type=int, default=50,
                         help='PI size: PI_dim * PI_dim')
+    parser.add_argument('--tensor_decomp', type = str, default = "CP", choices=["CP","TT","Tucker"],
+                                        help='Tensor decomp type for TRL')
     args = parser.parse_args()
 
     #set up seeds and gpu device
@@ -140,11 +142,12 @@ def main():
     print('finished loading PI for dataset {} with PI_dim = {}'.format(args.dataset,args.PI_dim))
     
     train_graphs, train_PIs, test_graphs, test_PIs = separate_TUDataset(graphs, PIs, args.seed, args.fold_idx)
-    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.node_pooling, args.PI_dim, args.sublevel_filtration_methods, device).to(device)
+    model = TenGCN(args.num_layers, args.num_mlp_layers, train_graphs[0].x.shape[1], args.hidden_dim, num_classes, args.final_dropout, args.tensor_layer_type, args.tensor_decomp, args.node_pooling, args.PI_dim, args.sublevel_filtration_methods, device).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     max_acc = 0.0
+    st = time()
     for epoch in range(1, args.epochs + 1):
         print("Current epoch is:", epoch)
 
@@ -160,6 +163,9 @@ def main():
                 # f.write("%f %f %f" % (avg_loss, acc_train, acc_test))
                 f.write("%f %f %f" % (avg_loss, acc_test))
                 f.write("\n")
+    
+    time_epoch = (time()-st)/args.epochs
+    print('run time: {} s per epoch'.format(time_epoch))
 
     with open('acc_results.txt', 'a+') as f:
         f.write(str(args.fold_idx) + ': ' + str(max_acc) + '\n')

@@ -12,7 +12,7 @@ from diagram import sum_diag_from_point_cloud
 from tltorch import TRL, TCL
 
 class TenGCN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, tensor_layer_type, node_pooling, PI_dim, sublevel_filtration_methods, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, tensor_layer_type, tensor_decomp, node_pooling, PI_dim, sublevel_filtration_methods, device):
         '''
             num_layers: number of GCN layers (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -52,7 +52,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.GCN_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.GCN_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
+            self.GCN_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=tensor_decomp)
 
         # PI tensor block
         # CNN
@@ -64,7 +64,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.PI_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
+            self.PI_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=tensor_decomp)
 
         # output block
         self.attend = nn.Linear(2*hidden_dim, 1)
@@ -73,7 +73,7 @@ class TenGCN(nn.Module):
         if tensor_layer_type == 'TCL':
             self.output_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
-            self.output_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape)
+            self.output_tensor_layer = TRL(tensor_input_shape,tensor_hidden_shape,factorization=tensor_decomp)
         self.output = MLP_output(hidden_dim,output_dim)
         self.dropout = nn.Dropout(self.final_dropout)
 
