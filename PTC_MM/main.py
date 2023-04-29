@@ -7,6 +7,7 @@ import numpy as np
 from torch_geometric.datasets import TUDataset
 
 from tqdm import trange
+from time import time
 
 from util import separate_TUDataset, compute_PI_tensor
 from models.tensorgcn import TenGCN
@@ -89,7 +90,7 @@ def main():
                         help='input batch size for training (default: 32)')
     parser.add_argument('--iters_per_epoch', type=int, default=50,
                         help='number of iterations per each epoch (default: 50)')
-    parser.add_argument('--epochs', type=int, default=30,
+    parser.add_argument('--epochs', type=int, default=20,
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='learning rate (default: 0.01)')
@@ -144,6 +145,7 @@ def main():
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     max_acc = 0.0
+    st = time()
     for epoch in range(1, args.epochs + 1):
         print("Current epoch is:", epoch)
 
@@ -160,8 +162,11 @@ def main():
                 f.write("%f %f %f" % (avg_loss, acc_test))
                 f.write("\n")
 
-    with open('acc_results.txt', 'a+') as f:
-        f.write(str(args.fold_idx) + ': ' + str(max_acc) + '\n')
+    time_epoch = (time()-st)/args.epochs
+    print('run time: {} s per epoch'.format(time_epoch))
+    
+    # with open('acc_results.txt', 'a+') as f:
+    #     f.write(str(args.fold_idx) + ': ' + str(max_acc) + '\n')
 
 if __name__ == '__main__':
     main()
