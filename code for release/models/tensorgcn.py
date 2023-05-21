@@ -48,7 +48,7 @@ class TenGCN(nn.Module):
             self.mlps.append(MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim**2))
         # tensor layer
         tensor_input_shape = (self.num_layers-1,hidden_dim,hidden_dim)
-        tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
+        tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim]
         if tensor_layer_type == 'TCL':
             self.GCN_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
@@ -60,7 +60,7 @@ class TenGCN(nn.Module):
         cnn_output_shape = cnn_output_dim(PI_dim)
         # tensor layer
         tensor_input_shape = (hidden_dim,cnn_output_shape,cnn_output_shape)
-        tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
+        tensor_hidden_shape = [hidden_dim,hidden_dim,hidden_dim]
         if tensor_layer_type == 'TCL':
             self.PI_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
@@ -69,7 +69,7 @@ class TenGCN(nn.Module):
         # output block
         self.attend = nn.Linear(2*hidden_dim, 1)
         tensor_input_shape = (2*hidden_dim,hidden_dim,hidden_dim)
-        tensor_hidden_shape = [2*hidden_dim,hidden_dim,hidden_dim] # for now set all dim as hidden_dim for convenience!
+        tensor_hidden_shape = [2*hidden_dim,hidden_dim,hidden_dim]
         if tensor_layer_type == 'TCL':
             self.output_tensor_layer = TCL(tensor_input_shape,tensor_hidden_shape)
         elif tensor_layer_type == 'TRL':
